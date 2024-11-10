@@ -26,58 +26,60 @@ Read full stdin input (until EOF) and write to FILE
         )
         sys.exit(1)
 
-    else:
-        source = sys.stdin
-        buffered = False
 
-        # Check if flag for alternative input or buffering in tmp file was set
-        if arg_number > 2:
-            for i in range(1, arg_number):
-                if sys.argv[i] == "-e":
-                    source = sys.stderr
-                if sys.argv[i] == "-t":
-                    buffered = True
+    source = sys.stdin
+    buffered = False
 
-        # Optional buffering of stdin in tmp file
-        if buffered:
-            # Read data in chunks and write to tmp file
-            tmp_buffer = TemporaryFile()
-            data = None
+    # Check if flag for alternative input or buffering in tmp file was set
+    if arg_number > 2:
+        for i in range(1, arg_number):
+            if sys.argv[i] == "-e":
+                source = sys.stderr
+            if sys.argv[i] == "-t":
+                buffered = True
 
-            # Read from stdin and write chunks to tmp file
-            with source as sf:
-                while True:
-                    data = sf.buffer.read(1024)
-                    if data == b"":
-                        break
-                    else:
-                        tmp_buffer.write(data)
 
-            # Flush buffer and return to start of tmp file
-            tmp_buffer.flush()
-            tmp_buffer.seek(0)
+    if not buffered:
+        # slurp data from source
+        data = source.buffer.read()
 
-            # Clear and/ or create file
-            destination = open(sys.argv[-1], "wb+")
-            destination.write(b"")
-            destination.close()
+        # write data to destination
+        with open(sys.argv[-1], "wb") as destination:
+            destination.write(data)
 
-            # Open in append mode to allow chunked writing from tmp file
-            with open(sys.argv[-1], "ab") as destination:
+        # Exit here
+        sys.exit(0)
+
+
+    # Optional buffering of stdin in tmp file
+    # Read data in chunks and write to tmp file
+    with TemporaryFile() as tmp_buffer:
+        data = None
+
+        # Read from stdin and write chunks to tmp file
+        with source as sf:
+            while True:
+                data = sf.buffer.read(1024)
+                if data == b"":
+                    break
+                else:
+                    tmp_buffer.write(data)
+
+        # Flush buffer and return to start of tmp file
+        tmp_buffer.flush()
+        tmp_buffer.seek(0)
+
+        # Clear and/ or create file
+        destination = open(sys.argv[-1], "wb+")
+        destination.write(b"")
+        destination.close()
+
+        # Open in append mode to allow chunked writing from tmp file
+        with open(sys.argv[-1], "ab") as destination:
+            data = tmp_buffer.read(1024)
+
+            # Write until all contents of tmp file are read
+            while data != b"":
+                destination.write(data)
                 data = tmp_buffer.read(1024)
 
-                # Write until all contents of tmp file are read
-                while data != b"":
-                    destination.write(data)
-                    data = tmp_buffer.read(1024)
-
-            # Close tmp file
-            tmp_buffer.close()
-
-        else:
-            # Slurp data from source
-            data = source.buffer.read()
-
-            # Write data to destination
-            with open(sys.argv[-1], "wb") as destination:
-                destination.write(data)
