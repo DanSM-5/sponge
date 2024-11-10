@@ -3,24 +3,19 @@
 # See either the LICENSE file in https://github.com/Chaostheorie/sponge or https://mit-license.org/
 
 import sys
+import argparse
 from tempfile import TemporaryFile
 
 if __name__ == "__main__":
-    if sys.argv[-1] in ["--help", "-h"]:
-        print(
-            """Usage: sponge [OPTION]... [FILE]
-Read full stdin input (until EOF) and write to FILE
-  -h, --help               Print this help message
-  -t                       Buffer stdin output in tmp file before writing
-  -e                       Read from stderr instead of stdin"""
-        )
-        sys.exit(0)
+    parser = argparse.ArgumentParser(prog = 'sponge', description = 'Sponge is a simple python tool for reading from stdin and writing the collected input to a file')
+    parser.add_argument('-t', '--tmp', action = argparse.BooleanOptionalAction, default = False, help = 'Buffer stdin output in a tmp file before writing', type = int)
+    parser.add_argument('-e', '--error', action = argparse.BooleanOptionalAction, default = False, help = 'Read from stderr instead of stdin')
+    parser.add_argument('file', action = 'store', default = None, help = 'File name to write to')
 
-    # Parse args
-    arg_number = len(sys.argv)
+    args = parser.parse_args()
 
     # Check if destination is specified
-    if arg_number == 1:
+    if not args.file:
         print(
             "You need to specify a destination file. See 'sponge --help' for usage information"
         )
@@ -28,23 +23,17 @@ Read full stdin input (until EOF) and write to FILE
 
 
     source = sys.stdin
-    buffered = False
+    buffered = args.tmp
 
-    # Check if flag for alternative input or buffering in tmp file was set
-    if arg_number > 2:
-        for i in range(1, arg_number):
-            if sys.argv[i] == "-e":
-                source = sys.stderr
-            if sys.argv[i] == "-t":
-                buffered = True
-
+    if args.error:
+      source = sys.stderr
 
     if not buffered:
         # slurp data from source
         data = source.buffer.read()
 
         # write data to destination
-        with open(sys.argv[-1], "wb") as destination:
+        with open(args.file, "wb") as destination:
             destination.write(data)
 
         # Exit here
@@ -70,12 +59,11 @@ Read full stdin input (until EOF) and write to FILE
         tmp_buffer.seek(0)
 
         # Clear and/ or create file
-        destination = open(sys.argv[-1], "wb+")
-        destination.write(b"")
-        destination.close()
+        with open(args.file, "wb+") as destination:
+            destination.write(b"")
 
         # Open in append mode to allow chunked writing from tmp file
-        with open(sys.argv[-1], "ab") as destination:
+        with open(args.file, "ab") as destination:
             data = tmp_buffer.read(1024)
 
             # Write until all contents of tmp file are read
